@@ -19,21 +19,6 @@ import java.util.*
 import kotlin.concurrent.thread
 
 
-/* MediaDecoder
-
-   Author: Andrew Stubbs (based on some examples from the docs)
-
-   This class opens a file, reads the first audio channel it finds, and returns raw audio data.
-
-   Usage:
-      MediaDecoder decoder = new MediaDecoder("myfile.m4a");
-      short[] data;
-      while ((data = decoder.readShortData()) != null) {
-         // process data here
-      }
-  */
-
-
 
 class AudioDecoder(inputFilename: Int, ctx: Context, audioSamples: Queue<ShortArray>) {
     private val extractor = MediaExtractor()
