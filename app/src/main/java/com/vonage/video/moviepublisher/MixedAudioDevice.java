@@ -68,12 +68,8 @@ class MixedAudioDevice extends BaseAudioDevice {
     private ByteBuffer recBuffer;
     private byte[] tempBufPlay;
     private byte[] tempBufRec;
-    public Queue<short[]> audioSamples;
 
 
-    private short[] curSample = null;
-    private int curSampleSize = 0;
-    private int curSamplePos = 0;
 
     private final ReentrantLock rendererLock = new ReentrantLock(true);
     private final Condition renderEvent = rendererLock.newCondition();
@@ -89,7 +85,6 @@ class MixedAudioDevice extends BaseAudioDevice {
     private AudioSettings rendererSettings;
     private NoiseSuppressor noiseSuppressor;
     private AcousticEchoCanceler echoCanceler;
-    private AudioDecoder aDecoder = null;
     // Capturing delay estimation
     private int estimatedCaptureDelay = 0;
 
@@ -114,6 +109,7 @@ class MixedAudioDevice extends BaseAudioDevice {
     private final Object bluetoothLock = new Object();
     private TelephonyManager telephonyManager;
 
+    private MoviePlayer mPlayer = null;
     private boolean isPaused;
 
     private enum OutputType {
@@ -435,11 +431,10 @@ class MixedAudioDevice extends BaseAudioDevice {
         startBluetoothSco();
     }
 
-    public MixedAudioDevice(Context context, Integer fileId) {
+    public MixedAudioDevice(Context context, MoviePlayer player) {
         this.context = context;
-        audioSamples = new LinkedList<>();
-        aDecoder = new AudioDecoder(fileId,context,audioSamples);
-        aDecoder.startProcessing();
+        mPlayer = player;
+        mPlayer.startAudioProcessing();
         try {
             recBuffer = ByteBuffer.allocateDirect(DEFAULT_BUFFER_SIZE);
         } catch (Exception e) {
@@ -695,68 +690,25 @@ class MixedAudioDevice extends BaseAudioDevice {
             }
             //Log.d(TAG,"About to read");
             short [] temp = new short[samplesRead];
-            Boolean bufferFilled = false;
-            if(curSample != null){
-                if(curSamplePos + samplesRead < curSampleSize){
-                    System.arraycopy(curSample,curSamplePos,temp,0,samplesRead);
-                    curSamplePos += samplesRead;
-                    bufferFilled = true;
-                    //Log.d(TAG,"Read " + samplesRead + "Samples");
-                }
-                else{
-                    System.arraycopy(curSample,curSamplePos,temp,0,curSampleSize-curSamplePos);
-                    //Log.d(TAG,"Read " + (curSampleSize-curSamplePos) + "Samples");
-                    if(audioSamples.peek() != null){
-                        curSample = audioSamples.remove();
-                        System.arraycopy(curSample,0,temp,curSampleSize-curSamplePos,samplesRead-(curSampleSize-curSamplePos));
-                        //Log.d(TAG,"Read " + (samplesRead-(curSampleSize-curSamplePos)) + "Samples from new buffer");
-                        curSamplePos =  samplesRead-(curSampleSize-curSamplePos);
-                        curSampleSize = curSample.length;
-                        bufferFilled = true;
-                    }
-                    else{
-                        Log.d(TAG,"Filling zeros");
-                        for(int i=curSampleSize-curSamplePos; i<(samplesRead-(curSampleSize-curSamplePos));i++) {
-                            temp[i] = 0;
-                        }
-                        if(audioSamples.peek() != null){
-                            curSample = audioSamples.remove();
-                            curSamplePos=0;
-                            curSampleSize=curSample.length;
-                        }
-                        else {
-
-                            curSample = null;
-                            curSampleSize = 0;
-                            curSamplePos = 0;
-                        }
-                    }
-                }
-            }
-            else{
-                if(audioSamples.peek() != null){
-                    curSample = audioSamples.remove();
-                    curSamplePos=0;
-                    curSampleSize=curSample.length;
-                }
-            }
-            /*ShortBuffer in1 = ByteBuffer.wrap(tempBufRec).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+            boolean isBufferFilled = mPlayer.getAudioSamples(samplesRead,temp);
+            ShortBuffer in1 = ByteBuffer.wrap(tempBufRec).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
             for(int m=0;m<samplesRead;m++){
-                float bIn1 = temp[m] * 1.0f;
-                float bIn2 = in1.get(m) * 1.0f;
-                float mixed = (bIn1 + bIn2) * 0.8f;
-                if (mixed > Short.MAX_VALUE) {
-                    mixed = Short.MAX_VALUE;
+                float bIn1 = temp[m] ;
+                float bIn2 = in1.get(m);
+                float mixed = bIn1+bIn2;
+                short sMixed = (short) (mixed);
+                if (sMixed > Short.MAX_VALUE) {
+                    sMixed = Short.MAX_VALUE;
                 }
-                if (mixed < Short.MIN_VALUE) {
-                    mixed = Short.MIN_VALUE;
+                if (sMixed < Short.MIN_VALUE) {
+                    sMixed = Short.MIN_VALUE;
                 }
-                temp[m] = (short)mixed;
-            }*/
-            //if(bufferFilled)
-                getAudioBus().writeCaptureData(aDecoder.ShortToByte_ByteBuffer_Method(temp),samplesRead);
-            //else
-              //  getAudioBus().writeCaptureData(recBuffer, samplesRead);
+                temp[m] = sMixed;
+            }
+            if(isBufferFilled)
+                getAudioBus().writeCaptureData(mPlayer.ShortToByte_ByteBuffer_Method(temp),samplesRead);
+            else
+                getAudioBus().writeCaptureData(recBuffer, samplesRead);
             estimatedCaptureDelay = samplesRead * 1000 / captureSamplingRate;
         }
     };

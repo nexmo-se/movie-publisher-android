@@ -21,14 +21,16 @@ class MainActivity : AppCompatActivity() {
     private var sub: Subscriber? = null
     private var session: Session? = null
     private var TAG: String = "MoviePublisherMainActivity"
+
+    private var moviePlayer: MoviePlayer? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        ActivityCompat.requestPermissions(this,
-            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-            123)
         pubLayout = findViewById(R.id.publisherLayout)
-        var aDevice = MixedAudioDevice(this,R.raw.vonage_roadshow)
+
+        moviePlayer = MoviePlayer(R.raw.vonage_roadshow,this)
+
+        var aDevice = MixedAudioDevice(this,moviePlayer)
         AudioDeviceManager.setAudioDevice(aDevice)
         initializeSession(apiKey,sessionId,token)
     }
@@ -49,8 +51,7 @@ class MainActivity : AppCompatActivity() {
     private val sessionListener: Session.SessionListener = object : Session.SessionListener {
         override fun onConnected(session: Session) {
             Log.d(TAG, "onConnected: Connected to session: ${session.sessionId}")
-            var movieVideoCapturer: MovieVideoCapturer = MovieVideoCapturer()
-            movieVideoCapturer.setMovieFile(R.raw.vonage_roadshow, applicationContext)
+            var movieVideoCapturer: MovieVideoCapturer = MovieVideoCapturer(moviePlayer!!)
 
             pub = Publisher.Builder(this@MainActivity).capturer(movieVideoCapturer).build()
             //pub?.publishAudio = false
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
             pubLayout?.addView(pub?.view)
 
             session.publish(pub)
+            moviePlayer?.hasStarted = true
         }
 
         override fun onDisconnected(session: Session) {
