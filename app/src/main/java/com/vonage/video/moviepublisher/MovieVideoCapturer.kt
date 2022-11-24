@@ -73,12 +73,15 @@ class MovieVideoCapturer(moviePlayer: MoviePlayer) : BaseVideoCapturer(){
         mPlayer?.initVideoSurface()
         while(true){
             val videoFrame = mPlayer?.readVideoData()
-            provideBufferFrame(videoFrame, ARGB,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
+
             val curTimeMs = System.currentTimeMillis()
             val sleepMs = (1000/mPlayer!!.frameRate) - (curTimeMs-prevTimestamp)
-            Log.d(TAG, "Sleep time: $sleepMs")
+            //Log.d(TAG, "Sleep time: $sleepMs")
             if(sleepMs>0) Thread.sleep(sleepMs)
+            mPlayer?.shouldPushVideo()
+            provideBufferFrame(videoFrame, ARGB,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
             prevTimestamp = System.currentTimeMillis()
+
         }
     }
 }

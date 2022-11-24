@@ -32,6 +32,9 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
     private var curSampleSize = 0
     private var curSamplePos = 0
     var hasStarted: Boolean = false;
+    var audioPresentationTime: Long = 0
+    var videoPresentationTime: Long = 0
+
     var videoDecoder: MediaCodec? = null
     private val videoExtractor = MediaExtractor()
     var videoOutputSurface: CodecOutputSurface? = null
@@ -118,8 +121,22 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
         videoDecoder!!.configure(videoFormat, videoOutputSurface!!.surface, null, 0)
         videoDecoder?.start()
     }
+
+    public fun shouldPushAudio(): Boolean {
+        val videoTime: Long = videoExtractor.getSampleTime()
+        //Log.d(TAG,(audioPresentationTime-videoTime).toString())
+        return audioPresentationTime <= videoTime
+    }
+
+    // Check if video work loop should continue
+    public fun shouldPushVideo(): Boolean {
+        val videoTime: Long = videoExtractor.getSampleTime()
+        //Log.d(TAG, (videoPresentationTime - videoTime).toString())
+        return audioPresentationTime >= videoTime
+    }
     fun readVideoData() : ByteBuffer?{
         if(!hasStarted) return null
+        if(!shouldPushVideo()) return null
         val TIMEOUT_USEC = 10000
         val decoderInputBuffers = videoDecoder?.inputBuffers
         val info = MediaCodec.BufferInfo()
@@ -163,7 +180,9 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
                 }
             }
             if (!outputDone) {
+                videoPresentationTime = info.presentationTimeUs
                 val decoderStatus = videoDecoder?.dequeueOutputBuffer(info, TIMEOUT_USEC.toLong())
+               // Log.d(TAG,(info.presentationTimeUs - videoPresentationTime).toString())
                 if (decoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     // no output available yet
                     Log.d(TAG, "no output from decoder available")
@@ -231,7 +250,8 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
                     for (i in curSampleSize - curSamplePos until samplesRead - (curSampleSize - curSamplePos)) {
                         temp[i] = 0
                     }
-                    if (audioSamples!!.peek() != null) {
+                    bufferFilled = true
+                    if (audioSamples != null && audioSamples!!.peek() != null) {
                         curSample = audioSamples!!.remove()
                         curSamplePos = 0
                         curSampleSize = curSample!!.size
@@ -243,7 +263,7 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
                 }
             }
         } else {
-            if (audioSamples!!.peek() != null) {
+            if ( audioSamples != null && audioSamples!!.peek() != null) {
                 curSample = audioSamples!!.remove()
                 curSamplePos = 0
                 curSampleSize = curSample!!.size
@@ -251,10 +271,30 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
         }
         return bufferFilled
     }
+    fun cloneByteBuffer(original: ByteBuffer): ByteBuffer? {
+        // Create clone with same capacity as original.
+        val clone =
+            if (original.isDirect) ByteBuffer.allocateDirect(original.capacity()) else ByteBuffer.allocate(
+                original.capacity()
+            )
+
+        // Create a read-only copy of the original.
+        // This allows reading from the original without modifying it.
+        val readOnlyCopy = original.asReadOnlyBuffer()
+
+        // Flip and read from the original.
+        readOnlyCopy.flip()
+        clone.put(readOnlyCopy)
+        return clone
+    }
     public fun readAudioData(info: MediaCodec.BufferInfo): ByteBuffer? {
         if (audioDecoder == null) return null
-        while (true) {
 
+        while (true) {
+            if (!shouldPushAudio()){
+                Thread.sleep(1)
+                continue
+            }
             // Read data from the file into the codec.
             if (!audio_end_of_input_file) {
                 val inputBufferIndex = audioDecoder!!.dequeueInputBuffer(10000)
@@ -286,7 +326,7 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
             // Read the output from the codec.
             if (audioOutputBufferIndex >= 0) // Ensure that the data is placed at the start of the buffer
                 audioOutputBuffers!![audioOutputBufferIndex].position(0)
-            //Log.d(TAG,"A_PRESENTTIME: ${info.presentationTimeUs}")
+            audioPresentationTime = info.presentationTimeUs
             audioOutputBufferIndex = audioDecoder!!.dequeueOutputBuffer(info, 10000)
             if (audioOutputBufferIndex >= 0) {
                 // Handle EOF
@@ -345,14 +385,14 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
 
     fun startAudioProcessing(){
         thread {
+            var info:MediaCodec.BufferInfo = MediaCodec.BufferInfo()
             while(true) {
-                var info:MediaCodec.BufferInfo = MediaCodec.BufferInfo()
-                var ret = readAudioData(info)
-                if(ret == null || audio_end_of_input_file){
-                    break
-                }
-                ret = null;
-                Thread.sleep(3)
+
+                    var ret = readAudioData(info)
+                    if (ret == null || audio_end_of_input_file) {
+                        break
+                    }
+                    ret = null
             }
         }
     }

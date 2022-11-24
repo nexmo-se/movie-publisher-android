@@ -49,12 +49,11 @@ class MixedAudioDevice extends BaseAudioDevice {
     private static final int NUM_CHANNELS_CAPTURING = 1;
     private static final int NUM_CHANNELS_RENDERING = 1;
     private static final int STEREO_CHANNELS = 2;
-    private static final int DEFAULT_SAMPLE_RATE = 44100;
+    private static  int DEFAULT_SAMPLE_RATE = 0;
     private static final int SAMPLE_SIZE_IN_BYTES = 2;
-    private static final int DEFAULT_SAMPLES_PER_BUFFER = (DEFAULT_SAMPLE_RATE / 1000) * 10; // 10ms
-    private static final int DEFAULT_BUFFER_SIZE =
-            SAMPLE_SIZE_IN_BYTES * DEFAULT_SAMPLES_PER_BUFFER * STEREO_CHANNELS;
-    // Max 10 ms @ 48 kHz - Stereo
+    private static  int DEFAULT_SAMPLES_PER_BUFFER = 0; // 10ms
+    private static  int DEFAULT_BUFFER_SIZE = 0;
+
     private static final int DEFAULT_START_RENDERER_AND_CAPTURER_DELAY = 5 * 1000;
     private static final int DEFAULT_BLUETOOTH_SCO_START_DELAY = 2000;
 
@@ -96,8 +95,8 @@ class MixedAudioDevice extends BaseAudioDevice {
     private AudioManager audioManager;
     private AudioManagerMode audioManagerMode = new AudioManagerMode();
 
-    private int outputSamplingRate = DEFAULT_SAMPLE_RATE;
-    private int captureSamplingRate = DEFAULT_SAMPLE_RATE;
+    private int outputSamplingRate = 0;
+    private int captureSamplingRate = 0;
     private int samplesPerBuffer = DEFAULT_SAMPLES_PER_BUFFER;
 
     // For headset receiver.
@@ -431,8 +430,16 @@ class MixedAudioDevice extends BaseAudioDevice {
         startBluetoothSco();
     }
 
-    public MixedAudioDevice(Context context, MoviePlayer player) {
+    public MixedAudioDevice(Context context, MoviePlayer player, int sampleRate) {
         this.context = context;
+        DEFAULT_SAMPLE_RATE = sampleRate;
+        DEFAULT_SAMPLES_PER_BUFFER = (DEFAULT_SAMPLE_RATE / 1000) * 10; // 10ms
+        DEFAULT_BUFFER_SIZE =
+                SAMPLE_SIZE_IN_BYTES * DEFAULT_SAMPLES_PER_BUFFER * STEREO_CHANNELS;
+        outputSamplingRate = DEFAULT_SAMPLE_RATE;
+        captureSamplingRate = DEFAULT_SAMPLE_RATE;
+        samplesPerBuffer = DEFAULT_SAMPLES_PER_BUFFER;
+        // Max 10 ms @ 48 kHz - Stereo
         mPlayer = player;
         mPlayer.startAudioProcessing();
         try {
@@ -690,25 +697,34 @@ class MixedAudioDevice extends BaseAudioDevice {
             }
             //Log.d(TAG,"About to read");
             short [] temp = new short[samplesRead];
+
             boolean isBufferFilled = mPlayer.getAudioSamples(samplesRead,temp);
-            ShortBuffer in1 = ByteBuffer.wrap(tempBufRec).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
-            for(int m=0;m<samplesRead;m++){
-                float bIn1 = temp[m] ;
-                float bIn2 = in1.get(m);
-                float mixed = bIn1+bIn2;
-                short sMixed = (short) (mixed);
-                if (sMixed > Short.MAX_VALUE) {
-                    sMixed = Short.MAX_VALUE;
+
+            if(isBufferFilled) {
+                ShortBuffer in1 = ByteBuffer.wrap(tempBufRec).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+                for (int m = 0; m < samplesRead; m++) {
+                    float bIn1 = temp[m];
+                    float bIn2 = in1.get(m);
+                    float mixed = bIn1 + bIn2;
+                    short sMixed = (short) (mixed);
+                    if (sMixed > Short.MAX_VALUE) {
+                        sMixed = Short.MAX_VALUE;
+                    }
+                    if (sMixed < Short.MIN_VALUE) {
+                        sMixed = Short.MIN_VALUE;
+                    }
+                    temp[m] = sMixed;
                 }
-                if (sMixed < Short.MIN_VALUE) {
-                    sMixed = Short.MIN_VALUE;
-                }
-                temp[m] = sMixed;
             }
+            else {
+                temp = null;
+            }
+
             if(isBufferFilled)
                 getAudioBus().writeCaptureData(mPlayer.ShortToByte_ByteBuffer_Method(temp),samplesRead);
             else
                 getAudioBus().writeCaptureData(recBuffer, samplesRead);
+
             estimatedCaptureDelay = samplesRead * 1000 / captureSamplingRate;
         }
     };

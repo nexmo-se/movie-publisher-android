@@ -28,9 +28,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         pubLayout = findViewById(R.id.publisherLayout)
 
-        moviePlayer = MoviePlayer(R.raw.vonage_roadshow,this)
+        moviePlayer = MoviePlayer(R.raw.sample_video,this)
 
-        var aDevice = MixedAudioDevice(this,moviePlayer)
+        var aDevice = MixedAudioDevice(this,moviePlayer,moviePlayer!!.audioSampleRate)
         AudioDeviceManager.setAudioDevice(aDevice)
         initializeSession(apiKey,sessionId,token)
     }
