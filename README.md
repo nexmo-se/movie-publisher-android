@@ -1,7 +1,7 @@
 # Movie Publisher 
 
 This projects lets you publish an mp4 file in to a Vonage video session. User can also speak while the video is being played
-Please see resources/raw folder for sample videos.
+. Please see resources/raw folder for sample videos.
 ## How it works
 
 ### Movie player
