@@ -79,7 +79,8 @@ class MovieVideoCapturer(moviePlayer: MoviePlayer) : BaseVideoCapturer(){
             //Log.d(TAG, "Sleep time: $sleepMs")
             if(sleepMs>0) Thread.sleep(sleepMs)
             mPlayer?.shouldPushVideo()
-            provideBufferFrame(videoFrame, ARGB,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
+            if(videoFrame != null)
+                provideBufferFrame(videoFrame, ARGB,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
             prevTimestamp = System.currentTimeMillis()
 
         }

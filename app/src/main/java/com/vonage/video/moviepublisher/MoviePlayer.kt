@@ -27,10 +27,8 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
     private var audioOutputBuffers: Array<ByteBuffer>? = null
     private var audioOutputBufferIndex = -1
     var audioTrackIndex: Int = -1
-    var audioSamples: Queue<ShortArray>? = null
-    private var curSample: ShortArray? = null
-    private var curSampleSize = 0
-    private var curSamplePos = 0
+    var inputSamples = AudioBufferStore("InputSamplesStore")
+    var outputSamples = AudioBufferStore("OutputSamplesStore")
     var hasStarted: Boolean = false;
     var audioPresentationTime: Long = 0
     var videoPresentationTime: Long = 0
@@ -62,8 +60,6 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
         if(audioTrackIndex == -1){
             throw Error("No Audio Track found");
         }
-
-        audioSamples = LinkedList()
     }
 
     fun getMovieDimensions(fileId: Int){
@@ -222,54 +218,12 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
     public fun getAudioSamples(samplesRead: Int, temp: ShortArray): Boolean{
         var bufferFilled = false
         if(!hasStarted) return bufferFilled
-        if (curSample != null) {
-            if (curSamplePos + samplesRead < curSampleSize) {
-                System.arraycopy(curSample, curSamplePos, temp, 0, samplesRead)
-                curSamplePos += samplesRead
-                bufferFilled = true
-
-                //Log.d(TAG,"Read " + samplesRead + "Samples");
-            } else {
-                System.arraycopy(curSample, curSamplePos, temp, 0, curSampleSize - curSamplePos)
-                //Log.d(TAG,"Read " + (curSampleSize-curSamplePos) + "Samples");
-                if (audioSamples!!.peek() != null) {
-                    curSample = audioSamples!!.remove()
-                    System.arraycopy(
-                        curSample,
-                        0,
-                        temp,
-                        curSampleSize - curSamplePos,
-                        samplesRead - (curSampleSize - curSamplePos)
-                    )
-                    //Log.d(TAG,"Read " + (samplesRead-(curSampleSize-curSamplePos)) + "Samples from new buffer");
-                    curSamplePos = samplesRead - (curSampleSize - curSamplePos)
-                    curSampleSize = curSample!!.size
-                    bufferFilled = true
-                } else {
-                    Log.d(TAG, "Filling zeros")
-                    for (i in curSampleSize - curSamplePos until samplesRead - (curSampleSize - curSamplePos)) {
-                        temp[i] = 0
-                    }
-                    bufferFilled = true
-                    if (audioSamples != null && audioSamples!!.peek() != null) {
-                        curSample = audioSamples!!.remove()
-                        curSamplePos = 0
-                        curSampleSize = curSample!!.size
-                    } else {
-                        curSample = null
-                        curSampleSize = 0
-                        curSamplePos = 0
-                    }
-                }
-            }
-        } else {
-            if ( audioSamples != null && audioSamples!!.peek() != null) {
-                curSample = audioSamples!!.remove()
-                curSamplePos = 0
-                curSampleSize = curSample!!.size
-            }
-        }
-        return bufferFilled
+        return inputSamples.getAudioSamples(samplesRead,temp)
+    }
+    public fun getOutputAudioSamples(samplesRead: Int, temp: ShortArray): Boolean{
+        var bufferFilled = false
+        if(!hasStarted) return bufferFilled
+        return outputSamples.getAudioSamples(samplesRead,temp)
     }
     fun cloneByteBuffer(original: ByteBuffer): ByteBuffer? {
         // Create clone with same capacity as original.
@@ -346,7 +300,7 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
                             res[i] = ( samples.get(i * numChannels + k)).toInt().toShort()
                         else
                             res[i] =
-                                ((res[i] + samples.get(i * numChannels + k)).toInt().toShort()/2).toShort()
+                                ((res[i] + samples.get(i * numChannels + k)).toInt().toShort()).toShort()
                         if (res[i] > Short.MAX_VALUE) {
                             res[i] = Short.MAX_VALUE;
                         }
@@ -355,7 +309,8 @@ class MoviePlayer(inputFilename: Int, ctx: Context) {
                         }
                     }
                 }
-                audioSamples?.add(res)
+                inputSamples.addSamples(res)
+                outputSamples.addSamples(res)
                 //pcmStream?.write(ShortToByte_ByteBuffer_Method(res))
                 // Release the buffer so MediaCodec can use it again.
                 // The data should stay there until the next time we are called.

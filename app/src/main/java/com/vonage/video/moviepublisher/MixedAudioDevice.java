@@ -68,8 +68,7 @@ class MixedAudioDevice extends BaseAudioDevice {
     private byte[] tempBufPlay;
     private byte[] tempBufRec;
 
-
-
+    //private AudioBufferStore bufferStore = new AudioBufferStore();
     private final ReentrantLock rendererLock = new ReentrantLock(true);
     private final Condition renderEvent = rendererLock.newCondition();
     private volatile boolean isRendering = false;
@@ -919,8 +918,40 @@ class MixedAudioDevice extends BaseAudioDevice {
                     int bytesRead = (samplesRead << 1) * NUM_CHANNELS_RENDERING;
                     playBuffer.get(tempBufPlay, 0, bytesRead);
 
-                    int bytesWritten = audioTrack.write(tempBufPlay, 0, bytesRead);
+                    ///
 
+                    boolean isBufferFilled = false;
+                    short [] temp = new short[samplesRead];
+                    isBufferFilled = mPlayer.getOutputAudioSamples(samplesRead,temp);
+                    if(isBufferFilled) {
+                        ShortBuffer in1 = ByteBuffer.wrap(tempBufPlay).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+                        for (int m = 0; m < samplesRead; m++) {
+                            float bIn1 = temp[m];
+                            float bIn2 = in1.get(m);
+                            float mixed = bIn1 + bIn2;
+                            short sMixed = (short) (mixed);
+                            if (sMixed > Short.MAX_VALUE) {
+                                sMixed = Short.MAX_VALUE;
+                            }
+                            if (sMixed < Short.MIN_VALUE) {
+                                sMixed = Short.MIN_VALUE;
+                            }
+                            temp[m] = sMixed;
+                        }
+                    }
+                    else {
+                        temp = null;
+                    }
+
+
+                    ///
+                    int bytesWritten = 0;
+                    if(isBufferFilled) {
+                        bytesWritten = audioTrack.write(temp,0,samplesRead);
+                    }
+                    else{
+                        bytesWritten = audioTrack.write(tempBufPlay, 0, bytesRead);
+                    }
                     if (bytesWritten > 0) {
                         // increase by number of written samples
                         bufferedPlaySamples += (bytesWritten >> 1) / NUM_CHANNELS_RENDERING;

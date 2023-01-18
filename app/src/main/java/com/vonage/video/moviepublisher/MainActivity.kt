@@ -1,20 +1,15 @@
 package com.vonage.video.moviepublisher
-import android.Manifest
-import android.media.MediaCodec.BufferInfo
 import android.os.Bundle
 import android.util.Log
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import com.opentok.android.*
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
 
 
 class MainActivity : AppCompatActivity() {
-    private var token: String = "T1==cGFydG5lcl9pZD00NjE4MzQ1MiZzaWc9MDc2ZDVkNDBhZGU1Mzg5OWJmNWVjMTIwZTRjZDQxYzllMmE3N2JmOTpzZXNzaW9uX2lkPTJfTVg0ME5qRTRNelExTW41LU1UWTJPRGs1TlRBeE5qYzBNWDVFYjNrdmFHaENiMFEzUjIxcmNVMW9UM2RsU2tWMU5uQi1mZyZjcmVhdGVfdGltZT0xNjY4OTk1MDE3Jm5vbmNlPTAuNzg5Mzg5MTU0OTQxMDkxNCZyb2xlPW1vZGVyYXRvciZleHBpcmVfdGltZT0xNjY5NTk5ODE3JmluaXRpYWxfbGF5b3V0X2NsYXNzX2xpc3Q9"
-    private var sessionId: String = "2_MX40NjE4MzQ1Mn5-MTY2ODk5NTAxNjc0MX5Eb3kvaGhCb0Q3R21rcU1oT3dlSkV1NnB-fg"
+    private var token: String = "T1==cGFydG5lcl9pZD00NjE4MzQ1MiZzaWc9YjI5MTE4MjU3NjI3NDIwOWMyZTY2ODI4NGZmZWE1ZjBhNTkxMmUyNDpzZXNzaW9uX2lkPTJfTVg0ME5qRTRNelExTW41LU1UWTNNamc0T0RZMk9ERTNOMzVEWWxBNWVHOUJaa1ZQYWl0WFlVUnRRbmhQTUhaaE0wSi1mbjQmY3JlYXRlX3RpbWU9MTY3NDAyMzUyNyZub25jZT0wLjM3MjAzOTIzMjM0NTIxODImcm9sZT1tb2RlcmF0b3ImZXhwaXJlX3RpbWU9MTY3NjYxNTUyNyZpbml0aWFsX2xheW91dF9jbGFzc19saXN0PQ=="
+    private var sessionId: String = "2_MX40NjE4MzQ1Mn5-MTY3Mjg4ODY2ODE3N35DYlA5eG9BZkVPaitXYURtQnhPMHZhM0J-fn4"
     private var apiKey: String = "46183452"
     private var pubLayout: FrameLayout? = null
     private var pub: Publisher? = null
@@ -57,6 +52,7 @@ class MainActivity : AppCompatActivity() {
             //pub?.publishAudio = false
             pub?.setPublisherListener(publisherListerner)
             pub?.setStyle(BaseVideoRenderer.STYLE_VIDEO_SCALE, BaseVideoRenderer.STYLE_VIDEO_FILL);
+            //pub?.publishVideo = false
             pubLayout?.addView(pub?.view)
 
             session.publish(pub)
@@ -69,6 +65,18 @@ class MainActivity : AppCompatActivity() {
 
         override fun onStreamReceived(session: Session, stream: Stream) {
             Log.d(TAG, "onStreamReceived: New Stream Received ${stream.streamId} in session: ${session.sessionId}")
+            if (sub == null) {
+                sub = Subscriber.Builder(this@MainActivity, stream).build().also {
+                    it.renderer?.setStyle(
+                        BaseVideoRenderer.STYLE_VIDEO_SCALE,
+                        BaseVideoRenderer.STYLE_VIDEO_FILL
+                    )
+
+                    it.setSubscriberListener(subscriberListener)
+                }
+
+                session.subscribe(sub)
+            }
         }
 
         override fun onStreamDropped(session: Session, stream: Stream) {
