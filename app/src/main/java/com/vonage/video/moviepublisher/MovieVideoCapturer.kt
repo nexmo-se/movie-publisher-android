@@ -54,7 +54,7 @@ class MovieVideoCapturer(moviePlayer: MoviePlayer) : BaseVideoCapturer(){
 
         val settings:CaptureSettings = CaptureSettings()
         settings.expectedDelay = 0
-        settings.format = ARGB
+        settings.format = ABGR
         settings.mirrorInLocalRender = false
         settings.width = mPlayer!!.movieWidth
         settings.height = mPlayer!!.movieHeight
@@ -80,7 +80,7 @@ class MovieVideoCapturer(moviePlayer: MoviePlayer) : BaseVideoCapturer(){
             if(sleepMs>0) Thread.sleep(sleepMs)
             mPlayer?.shouldPushVideo()
             if(videoFrame != null)
-                provideBufferFrame(videoFrame, ARGB,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
+                provideBufferFrame(videoFrame, ABGR,mPlayer!!.movieWidth,mPlayer!!.movieHeight,0,false)
             prevTimestamp = System.currentTimeMillis()
 
         }
